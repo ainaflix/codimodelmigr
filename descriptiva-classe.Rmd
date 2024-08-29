@@ -1,0 +1,1049 @@
+---
+title: "Descriptiva tfg"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(dplyr)
+library(haven)
+library(knitr)
+library(tidyverse)
+library(ggrepel)
+library(logmult)
+library(MASS)
+library(xtable)
+library(flextable)
+library(officer)
+library(dplyr)
+library(ggplot2)
+library(labelled)
+library(questionr)
+library(gridExtra)
+```
+
+```{r}
+create_nice_table <- function(data, title) {
+  flextable(data) %>%
+    set_table_properties(width = 1, layout = "autofit") %>%
+    theme_zebra() %>%
+    theme_vanilla() %>%
+    set_caption(title)
+}
+
+```
+
+# Importem les dades i revisió
+
+```{r}
+dades <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/dades.csv")
+```
+
+*Passem a factors les variables que ho son:*
+
+```{r}
+sapply(dades, class)
+
+```
+
+
+```{r}
+var.factor <- c("essround","cntry", "gndr", "desti", "origen", "modeb", "cohort", "migracio", "origenmigracio", "migr.c", "movabs")
+dades[var.factor] <- lapply(dades[var.factor], factor)
+
+ordre<- c(1,2,3,4,9,6,8,5,7,10,12,11 )
+dades <- dades[, ordre]
+```
+
+
+
+#SUMMARY
+
+```{r}
+summary(dades)
+```
+
+
+
+
+# MIDA MOSTRAL SEGONS ELS FACTORS
+
+## MIDA MOSTRA PER RONDES
+
+```{r}
+mostra.rondes<- table(dades$essround)
+print(mostra.rondes)
+```
+
+```{r}
+dfmostrarondes <- data.frame(essround = as.factor(names(mostra.rondes)), muestra = as.numeric(mostra.rondes))
+```
+
+```{r}
+plotmrondes<-ggplot(data = dfmostrarondes, aes(x = essround, y = muestra)) +
+  geom_bar(stat = "identity", fill = "#0072B2", color = "#0072B2", width = 0.5) +  # Ancho de las barras ajustado
+  geom_text(aes(label = muestra), vjust = -0.5, color = "black", size = 3) +  # Mostrar número de muestra encima de las barras
+  labs(title = "Mida mostral per Ronda", x = "", y = "") +  # Etiquetas de los ejes
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 10))+ 
+  scale_x_discrete(labels = c("ESS1", "ESS2", "ESS3", "ESS4", "ESS5"))
+
+plotmrondes
+```
+
+```{r}
+ggsave("plotmrondes.png", plot = plotmrondes)
+```
+
+
+
+
+
+## MIDA MOSTRA PER GÈNERE
+```{r}
+mostra.genere<- table(dades$gndr)
+print(mostra.genere)
+```
+
+```{r}
+dfmostragenere <- data.frame(gndr = as.factor(names(mostra.genere)), muestra = as.numeric(mostra.genere))
+```
+
+```{r}
+plotmgenere<-ggplot(data = dfmostragenere, aes(x = gndr, y = muestra)) +
+  geom_bar(stat = "identity", fill = "#0072B2", color = "#0072B2", width = 0.5) +  # Ancho de las barras ajustado
+  geom_text(aes(label = muestra), vjust = -0.5, color = "black", size = 3) +  # Mostrar número de muestra encima de las barras
+  labs(title = "Mida mostral per gènere", x = "", y = "") +  
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 10))+ 
+  scale_x_discrete(labels = c("H", "D"))
+plotmgenere
+```
+
+```{r}
+ggsave("plotmgenere.png", plot = plotmgenere)
+```
+
+
+## MIDA MOSTRAL PER COHORTS
+
+```{r}
+mostra.cohort<- table(dades$cohort)
+print(mostra.cohort)
+```
+
+```{r}
+dfmostracohort <- data.frame(cohort = as.factor(names(mostra.cohort)), muestra = as.numeric(mostra.cohort))
+```
+
+```{r}
+plotmcohorts<-ggplot(data = dfmostracohort, aes(x = cohort, y = muestra)) +
+  geom_bar(stat = "identity", fill = "#0072B2", color = "#0072B2", width = 0.5) +  # Ancho de las barras ajustado
+  geom_text(aes(label = muestra), vjust = -0.5, color = "black", size = 3) +  # Mostrar número de muestra encima de las barras
+  labs(title = "Mida mostral per cohort", x = "", y = "") +  
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 10))
+plotmcohorts
+```
+
+
+```{r}
+ggsave("plotmcohorts.png", plot = plotmcohorts)
+```
+
+## MIDA MOSTRAL PER PAÏSOS
+
+
+```{r}
+mostra.pais<- table(dades$cntry)
+print(mostra.pais)
+```
+
+```{r}
+dfmostrapais <- data.frame(cntry = as.factor(names(mostra.pais)), muestra = as.numeric(mostra.pais))
+dfmostrapais$cntry <- factor(dfmostrapais$cntry, levels = dfmostrapais$cntry[order(dfmostrapais$muestra, decreasing = TRUE)])
+print(dfmostrapais)
+```
+
+```{r}
+plotmpaisos<- ggplot(data = dfmostrapais, aes(x = cntry, y = muestra)) +
+  geom_bar(stat = "identity", fill = "#0072B2", color = "#0072B2", width = 0.5) +  # Ancho de las barras ajustado
+  geom_text(aes(label = muestra), vjust = -0.5, color = "black", size = 3) +  # Mostrar número de muestra encima de las barras
+  labs(title = "Mida mostral per país", x = "", y = "") +  
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 10))
+
+plotmpaisos
+```
+
+
+```{r}
+ggsave("plotmpaisos.png", plot = plotmpaisos)
+```
+
+
+## MIDA MOSTRAL PER RÈGIMS DE L'ESTAT DEL BENSTAR
+
+```{r}
+mostra.modeb<- table(dades$modeb)
+print(mostra.modeb)
+```
+
+```{r}
+dfmostramodeb <- data.frame(modeb = as.factor(names(mostra.modeb)), muestra = as.numeric(mostra.modeb))
+```
+
+```{r}
+plotmmodeb<- ggplot(data = dfmostramodeb, aes(x = modeb, y = muestra)) +
+  geom_bar(stat = "identity", fill = "#0072B2", color = "#0072B2", width = 0.5) +  # Ancho de las barras ajustado
+  geom_text(aes(label = muestra), vjust = -0.5, color = "black", size = 3) +  # 
+  labs(title = "Mida mostral per model d'Estat del Benestar", x = "", y = "") +  
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 6))+ 
+  scale_x_discrete(labels = c("LIBERAL", "SOCIALDEMÒCRATA", "CONSERVADOR", "FAMILIARISTA"))
+
+plotmmodeb
+```
+
+
+```{r}
+ggsave("plotmmodeb.png", plot = plotmmodeb)
+```
+
+
+#ESTRUCTURA SOCIAL DE LA MOSTRA
+
+```{r}
+mostra.origen<- table(dades$originclass)
+mostra.desti<- table(dades$class5)
+```
+
+```{r}
+dfmostraorigen <- data.frame(class5 = as.factor(names(mostra.origen)), mostraorigen = as.numeric(mostra.origen))
+dfmostradesti <- data.frame(class5 = as.factor(names(mostra.desti)), mostradesti = as.numeric(mostra.desti))
+```
+
+```{r}
+dfestructurasocial<- inner_join(dfmostraorigen, dfmostradesti, by="class5")
+```
+
+
+```{r}
+
+total_mostraorigen <- sum(dfestructurasocial$mostraorigen)
+total_mostradesti <- sum(dfestructurasocial$mostradesti)
+
+
+dfestructurasocial$mostraorigen_relative <- (dfestructurasocial$mostraorigen / total_mostraorigen) * 100
+dfestructurasocial$mostradesti_relative <- (dfestructurasocial$mostradesti / total_mostradesti) * 100
+
+dfestructurasocial$class5 <- factor(dfestructurasocial$class5, levels = unique(dfestructurasocial$class5))
+
+
+library(tidyr)
+df_plot <- dfestructurasocial %>%
+  pivot_longer(cols = c(mostraorigen_relative, mostradesti_relative),
+               names_to = "Tipo", values_to = "Mostra") %>%
+  mutate(Tipo = factor(Tipo, levels = c("mostraorigen_relative", "mostradesti_relative"),
+                       labels = c("Origen", "Destí")))
+
+
+df_plot$Porcentaje <- paste0(round(df_plot$Mostra, 2))
+
+
+plotestructsocmostra <- ggplot(df_plot, aes(x = class5, y = Mostra, fill = Tipo)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.5) +
+  labs(title = "Estructura social de la mostra", x = "", y = "") +
+  scale_fill_manual(values = c("#0072B2", "#FFA500"), name = "Tipo") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 6)) +
+  scale_x_discrete(labels = c("Classe de serveide grau superior", "Classe de servei de grau inferior","Treballadors qualificats", "Propietaris de petites empreses",  "Treballadors no qualificats")) +
+  geom_text(aes(label = Porcentaje), position = position_dodge(width = 0.7), vjust = -0.5, size = 3)
+
+plotestructsocmostra
+
+```
+
+```{r}
+ggsave("plotestructsocmostra.png", plot = plotestructsocmostra)
+
+```
+
+
+# ESTRUCTURA SOCIAL PER TIPUS D'EB
+
+## LIBERAL
+
+```{r}
+dades2 <- subset(dades, modeb == 1)
+mostra.origen<- table(dades2$originclass)
+mostra.desti<- table(dades2$class5)
+```
+
+```{r}
+dfmostraorigen <- data.frame(class5 = as.factor(names(mostra.origen)), mostraorigen = as.numeric(mostra.origen))
+dfmostradesti <- data.frame(class5 = as.factor(names(mostra.desti)), mostradesti = as.numeric(mostra.desti))
+```
+
+```{r}
+dfestructurasocial<- inner_join(dfmostraorigen, dfmostradesti, by="class5")
+```
+
+
+```{r}
+
+total_mostraorigen <- sum(dfestructurasocial$mostraorigen)
+total_mostradesti <- sum(dfestructurasocial$mostradesti)
+
+
+dfestructurasocial$mostraorigen_relative <- (dfestructurasocial$mostraorigen / total_mostraorigen) * 100
+dfestructurasocial$mostradesti_relative <- (dfestructurasocial$mostradesti / total_mostradesti) * 100
+
+dfestructurasocial$class5 <- factor(dfestructurasocial$class5, levels = unique(dfestructurasocial$class5))
+
+
+library(tidyr)
+df_plot <- dfestructurasocial %>%
+  pivot_longer(cols = c(mostraorigen_relative, mostradesti_relative),
+               names_to = "Tipo", values_to = "Mostra") %>%
+  mutate(Tipo = factor(Tipo, levels = c("mostraorigen_relative", "mostradesti_relative"),
+                       labels = c("Origen", "Destí")))
+
+
+df_plot$Porcentaje <- paste0(round(df_plot$Mostra, 2))
+
+
+plotestructsocmostra <- ggplot(df_plot, aes(x = class5, y = Mostra, fill = Tipo)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.5) +
+  labs(title = "Estructura social de la mostra en EB liberals", x = "", y = "") +
+  scale_fill_manual(values = c("#0072B2", "#FFA500"), name = "Tipo") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 6)) +
+  scale_x_discrete(labels = c("Classe de serveide grau superior", "Classe de servei de grau inferior","Treballadors qualificats", "Propietaris de petites empreses",  "Treballadors no qualificats")) +
+  geom_text(aes(label = Porcentaje), position = position_dodge(width = 0.7), vjust = -0.5, size = 3)
+
+plotestructsocmostra
+
+```
+```{r}
+ggsave("plotestructsocmostraebliberal.png", plot = plotestructsocmostra)
+
+```
+
+## SOCIALDEMÒCRATA
+
+```{r}
+dades3 <- subset(dades, modeb == 2)
+mostra.origen<- table(dades3$originclass)
+mostra.desti<- table(dades3$class5)
+```
+
+```{r}
+dfmostraorigen <- data.frame(class5 = as.factor(names(mostra.origen)), mostraorigen = as.numeric(mostra.origen))
+dfmostradesti <- data.frame(class5 = as.factor(names(mostra.desti)), mostradesti = as.numeric(mostra.desti))
+```
+
+```{r}
+dfestructurasocial<- inner_join(dfmostraorigen, dfmostradesti, by="class5")
+```
+
+
+```{r}
+
+total_mostraorigen <- sum(dfestructurasocial$mostraorigen)
+total_mostradesti <- sum(dfestructurasocial$mostradesti)
+
+
+dfestructurasocial$mostraorigen_relative <- (dfestructurasocial$mostraorigen / total_mostraorigen) * 100
+dfestructurasocial$mostradesti_relative <- (dfestructurasocial$mostradesti / total_mostradesti) * 100
+
+dfestructurasocial$class5 <- factor(dfestructurasocial$class5, levels = unique(dfestructurasocial$class5))
+
+
+library(tidyr)
+df_plot <- dfestructurasocial %>%
+  pivot_longer(cols = c(mostraorigen_relative, mostradesti_relative),
+               names_to = "Tipo", values_to = "Mostra") %>%
+  mutate(Tipo = factor(Tipo, levels = c("mostraorigen_relative", "mostradesti_relative"),
+                       labels = c("Origen", "Destí")))
+
+
+df_plot$Porcentaje <- paste0(round(df_plot$Mostra, 2))
+
+
+plotestructsocmostra <- ggplot(df_plot, aes(x = class5, y = Mostra, fill = Tipo)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.5) +
+  labs(title = "Estructura social de la mostra en EB socialdemòcrates", x = "", y = "") +
+  scale_fill_manual(values = c("#0072B2", "#FFA500"), name = "Tipo") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 6)) +
+  scale_x_discrete(labels = c("Classe de serveide grau superior", "Classe de servei de grau inferior","Treballadors qualificats", "Propietaris de petites empreses",  "Treballadors no qualificats")) +
+  geom_text(aes(label = Porcentaje), position = position_dodge(width = 0.7), vjust = -0.5, size = 3)
+
+plotestructsocmostra
+
+```
+```{r}
+ggsave("plotestructsocmostrasocialdem.png", plot = plotestructsocmostra)
+```
+
+## CONSERVADOR
+
+```{r}
+dades4 <- subset(dades, modeb == 3)
+mostra.origen<- table(dades4$originclass)
+mostra.desti<- table(dades4$class5)
+```
+
+```{r}
+dfmostraorigen <- data.frame(class5 = as.factor(names(mostra.origen)), mostraorigen = as.numeric(mostra.origen))
+dfmostradesti <- data.frame(class5 = as.factor(names(mostra.desti)), mostradesti = as.numeric(mostra.desti))
+```
+
+```{r}
+dfestructurasocial<- inner_join(dfmostraorigen, dfmostradesti, by="class5")
+```
+
+
+```{r}
+
+total_mostraorigen <- sum(dfestructurasocial$mostraorigen)
+total_mostradesti <- sum(dfestructurasocial$mostradesti)
+
+
+dfestructurasocial$mostraorigen_relative <- (dfestructurasocial$mostraorigen / total_mostraorigen) * 100
+dfestructurasocial$mostradesti_relative <- (dfestructurasocial$mostradesti / total_mostradesti) * 100
+
+dfestructurasocial$class5 <- factor(dfestructurasocial$class5, levels = unique(dfestructurasocial$class5))
+
+
+library(tidyr)
+df_plot <- dfestructurasocial %>%
+  pivot_longer(cols = c(mostraorigen_relative, mostradesti_relative),
+               names_to = "Tipo", values_to = "Mostra") %>%
+  mutate(Tipo = factor(Tipo, levels = c("mostraorigen_relative", "mostradesti_relative"),
+                       labels = c("Origen", "Destí")))
+
+
+df_plot$Porcentaje <- paste0(round(df_plot$Mostra, 2))
+
+
+plotestructsocmostra <- ggplot(df_plot, aes(x = class5, y = Mostra, fill = Tipo)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.5) +
+  labs(title = "Estructura social de la mostra en EB conservadors", x = "", y = "") +
+  scale_fill_manual(values = c("#0072B2", "#FFA500"), name = "Tipo") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 6)) +
+  scale_x_discrete(labels = c("Classe de serveide grau superior", "Classe de servei de grau inferior","Treballadors qualificats", "Propietaris de petites empreses",  "Treballadors no qualificats")) +
+  geom_text(aes(label = Porcentaje), position = position_dodge(width = 0.7), vjust = -0.5, size = 3)
+
+plotestructsocmostra
+
+```
+```{r}
+ggsave("plotestructsocmostraconservador.png", plot = plotestructsocmostra)
+```
+
+
+
+## FAMILIARISTA
+
+```{r}
+dades5 <- subset(dades, modeb == 4)
+mostra.origen<- table(dades5$originclass)
+mostra.desti<- table(dades5$class5)
+```
+
+```{r}
+dfmostraorigen <- data.frame(class5 = as.factor(names(mostra.origen)), mostraorigen = as.numeric(mostra.origen))
+dfmostradesti <- data.frame(class5 = as.factor(names(mostra.desti)), mostradesti = as.numeric(mostra.desti))
+```
+
+```{r}
+dfestructurasocial<- inner_join(dfmostraorigen, dfmostradesti, by="class5")
+```
+
+
+```{r}
+
+total_mostraorigen <- sum(dfestructurasocial$mostraorigen)
+total_mostradesti <- sum(dfestructurasocial$mostradesti)
+
+
+dfestructurasocial$mostraorigen_relative <- (dfestructurasocial$mostraorigen / total_mostraorigen) * 100
+dfestructurasocial$mostradesti_relative <- (dfestructurasocial$mostradesti / total_mostradesti) * 100
+
+dfestructurasocial$class5 <- factor(dfestructurasocial$class5, levels = unique(dfestructurasocial$class5))
+
+
+library(tidyr)
+df_plot <- dfestructurasocial %>%
+  pivot_longer(cols = c(mostraorigen_relative, mostradesti_relative),
+               names_to = "Tipo", values_to = "Mostra") %>%
+  mutate(Tipo = factor(Tipo, levels = c("mostraorigen_relative", "mostradesti_relative"),
+                       labels = c("Origen", "Destí")))
+
+
+df_plot$Porcentaje <- paste0(round(df_plot$Mostra, 2))
+
+
+plotestructsocmostra <- ggplot(df_plot, aes(x = class5, y = Mostra, fill = Tipo)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.5) +
+  labs(title = "Estructura social de la mostra en EB familiarista", x = "", y = "") +
+  scale_fill_manual(values = c("#0072B2", "#FFA500"), name = "Tipo") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 6)) +
+  scale_x_discrete(labels = c("Classe de serveide grau superior", "Classe de servei de grau inferior","Treballadors qualificats", "Propietaris de petites empreses",  "Treballadors no qualificats")) +
+  geom_text(aes(label = Porcentaje), position = position_dodge(width = 0.7), vjust = -0.5, size = 3)
+
+plotestructsocmostra
+
+```
+```{r}
+ggsave("plotestructsocmostrafamiliarista.png", plot = plotestructsocmostra)
+```
+
+
+
+# ESTRUCURA MIGRATORIA
+
+## MOSTRA MIRGANT
+
+```{r}
+migracio_table <- as.data.frame(table(dades$migracio))
+colnames(migracio_table) <- c("Categoria", "Freqüència")
+
+migr1 <- create_nice_table(migracio_table, "MIGRACIÓ")
+migr1
+
+```
+
+### PRECENTUAL
+
+```{r}
+
+total <- sum(migracio_table$Freqüència)
+migracio_table$Porcentaje <- round((migracio_table$Freqüència / total) * 100, 2)
+migracion_porcentaje <- migracio_table[, c("Categoria", "Porcentaje")]
+colnames(migracion_porcentaje) <- c("Categoria", "Percentatge (%)")
+migracion_porcentaje <- migracion_porcentaje[order(-migracion_porcentaje$"Percentatge (%)"), ]
+migr1_porcentaje <- create_nice_table(migracion_porcentaje, " PERCENTATGES MIGRACIÓ MIGRACIÓ ")
+print(migr1_porcentaje)
+
+```
+
+```{r}
+ggplot(migracio_table, aes(x = "", y = Porcentaje, fill = Categoria)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar(theta = "y") + # Crear un gráfico de pastel
+  labs(title = "Distribució de Percentatges per Categoria", x = "", y = "") +
+  theme_minimal() +
+  theme(axis.ticks = element_blank(), axis.text.y = element_blank())
+```
+
+
+## MOSTRA MIGRANTS.C
+
+
+```{r}
+migr.c_table <- as.data.frame(table(dades$migr.c))
+colnames(migr.c_table) <- c("Categoria", "Freqüència")
+
+migr1 <- create_nice_table(migr.c_table, "MIGRACIÓ")
+migr1
+
+```
+
+### PRECENTUAL
+
+```{r}
+
+total <- sum(migr.c_table$Freqüència)
+migr.c_table$Porcentaje <- round((migr.c_table$Freqüència / total) * 100, 2)
+migr.cn_porcentaje <- migr.c_table[, c("Categoria", "Porcentaje")]
+colnames(migr.cn_porcentaje) <- c("Categoria", "Percentatge (%)")
+migr.cn_porcentaje <- migr.cn_porcentaje[order(-migr.cn_porcentaje$"Percentatge (%)"), ]
+migr1_porcentaje <- create_nice_table(migr.cn_porcentaje, " PERCENTATGES MIGRACIÓ MIGRACIÓ ")
+print(migr1_porcentaje)
+
+```
+
+```{r}
+ggplot(migr.c_table, aes(x = "", y = Porcentaje, fill = Categoria)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar(theta = "y") + # Crear un gráfico de pastel
+  labs(title = "Distribució de Percentatges per Categoria", x = "", y = "") +
+  theme_minimal() +
+  theme(axis.ticks = element_blank(), axis.text.y = element_blank())
+
+
+
+```
+
+
+
+# MIGRANTS PER PROCEDENCIA
+
+
+```{r}
+
+migrants <- dades %>%
+  filter(!migracio %in% c("No migrant"))  %>%
+  droplevels()
+
+taulamigr <- as.data.frame(table(migrants$migracio, migrants$origenmigracio))
+
+
+taulamigr2 <- taulamigr %>%
+  pivot_wider(names_from = Var1, values_from = Freq, values_fill = list(Freq = 0))
+
+taulamigr2 <- taulamigr2 %>%
+  rename(Continent = Var2)
+
+taulamigr2 <- taulamigr2 %>%
+  rowwise() %>%
+  mutate(across(-Continent, ~ round(. / sum(c_across(-Continent)) * 100, 2))) %>%
+  ungroup()
+
+ordre.migr <- c("Migrant sense papers", "Migrant", "Mare migrant", "Pare migrant", "Pare i mare migrant")
+taulamigr2 <- taulamigr2 %>%
+  relocate(all_of(ordre.migr), .after = Continent)
+
+create_nice_table(taulamigr2, "MIGRACIÓ PER CONTINENTS")
+
+
+```
+
+
+```{r}
+
+
+
+# Convertir el dataframe a formato largo para ggplot
+taulamigr2_long <- taulamigr2 %>%
+  pivot_longer(cols = ordre.migr, 
+               names_to = "Condicio", values_to = "Proporcio")
+
+# Convertir la columna Condicio a un factor con el orden deseado
+taulamigr2_long$Condicio <- factor(taulamigr2_long$Condicio, levels = ordre.migr)
+
+# Crear el gráfico de barras apiladas
+plot_migracio_per_continents <- ggplot(taulamigr2_long, aes(x = Continent, y = Proporcio, fill = Condicio)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(Proporcio, "%")), 
+            position = position_stack(vjust = 0.5),
+            color = "black", 
+            size = 3) +
+  labs(title = "Distribució de Condicions de Migració per Continent", x = "Continent", y = "Proporció (%)") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  guides(fill = guide_legend(title = "Condició de Migrant")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 8),
+        plot.title = element_text(hjust = 0.5, size = 10))
+
+# Mostrar el gráfico
+print(plot_migracio_per_continents)
+```
+
+
+
+#MIGRANT PER CLASSE SOCIAL
+
+## FUNCIÓ MIGRACIÓ COL·LAPSADA
+```{r}
+
+fmigrclasse <- function(dades, nombre_tabla1, nombre_tabla2, titulo_grafico) {
+  migrclasse <- as.data.frame(table(dades$migr.c, dades$class5))
+  colnames(migrclasse) <- c("Migració", "Classe", "Freqüència")
+  tmigrclasse <- create_nice_table(migrclasse, nombre_tabla1)
+  print(tmigrclasse)
+  
+  tmigrclasse2 <- migrclasse %>%
+    spread(key = Migració, value = Freqüència, fill = 0)
+  
+  colnames(tmigrclasse2) <- c("Classe", "Migrant 1a generació", "Migrant 2a generació", "No migrant")
+  
+  tmigrclasse2_nice <- create_nice_table(tmigrclasse2, nombre_tabla2)
+  print(tmigrclasse2_nice)
+  
+  # Calcular proporciones y ordenar
+  tmigrclasse3 <- migrclasse %>%
+    group_by(Migració) %>%
+    mutate(Prop = Freqüència / sum(Freqüència) * 100) %>%
+    ungroup()
+  
+  ordered_migracio <- tmigrclasse3 %>%
+    filter(Classe == "Unskilled workers") %>%
+    arrange(desc(Prop)) %>%
+    pull(Migració)
+  
+  tmigrclasse3 <- tmigrclasse3 %>%
+    mutate(Migració = factor(Migració, levels = ordered_migracio))
+  
+  # Crear el gráfico
+  plot_migrants_classe <- ggplot(tmigrclasse3, aes(x = Migració, y = Prop, fill = Classe)) +
+    geom_bar(stat = "identity", position = "stack") +
+    geom_text(aes(label = paste0(round(Prop, 1), "%")), position = position_stack(vjust = 0.5), color = "black", size = 3) +
+    labs(title = titulo_grafico, x = "", y = "Proporció (%)") +
+    scale_fill_brewer(palette = "Set3") +
+    theme_minimal() +
+    guides(fill = guide_legend(title = "Classe")) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          axis.text.y = element_text(size = 8),
+          plot.title = element_text(hjust = 0.5, size = 10))
+  
+  # Mostrar el gráfico
+  print(plot_migrants_classe)
+}
+
+```
+
+
+### FUNCIÓ MIGRACIÓ SENSE COL·LAPSAR
+
+```{r}
+
+# Definir la función
+fmigrclasse2 <- function(dades, nombre_tabla1, nombre_tabla2, titulo_grafico) {
+  # Crear la tabla de frecuencias
+  migrclasse2 <- as.data.frame(table(dades$migracio, dades$class5))
+  colnames(migrclasse2) <- c("Migració", "Classe", "Freqüència")
+  
+  # Crear y mostrar la primera tabla
+  tmigrclasse2 <- create_nice_table(migrclasse2, nombre_tabla1)
+  print(tmigrclasse2)
+  
+  # Crear la tabla pivotada
+  tmigrclasse4 <- migrclasse2 %>%
+    spread(key = Migració, value = Freqüència, fill = 0)
+  
+  # Crear y mostrar la segunda tabla
+  tmigrclasse4_nice <- create_nice_table(tmigrclasse4, nombre_tabla2)
+  print(tmigrclasse4_nice)
+  
+  # Calcular proporciones y ordenar
+  tmigrclasse5 <- migrclasse2 %>%
+    group_by(Migració) %>%
+    mutate(Prop = Freqüència / sum(Freqüència) * 100)
+  
+  ordered_migracio <- tmigrclasse5 %>%
+    filter(Classe == "Unskilled workers") %>%
+    arrange(desc(Prop)) %>%
+    pull(Migració)
+  
+  tmigrclasse5 <- tmigrclasse5 %>%
+    mutate(Migració = factor(Migració, levels = ordered_migracio))
+  
+  # Crear el gráfico
+  plot_migrants_classe2 <- ggplot(tmigrclasse5, aes(x = Migració, y = Prop, fill = Classe)) +
+    geom_bar(stat = "identity", position = "stack") +
+    geom_text(aes(label = paste0(round(Prop, 1), "%")), position = position_stack(vjust = 0.5), color = "black", size = 3) +
+    labs(title = titulo_grafico, x = "", y = "Proporció (%)") +
+    scale_fill_brewer(palette = "Set3") +
+    theme_minimal() +
+    guides(fill = guide_legend(title = "Classe")) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          axis.text.y = element_text(size = 8),
+          plot.title = element_text(hjust = 0.5, size = 10))
+  
+  # Mostrar el gráfico
+  print(plot_migrants_classe2)
+}
+
+
+
+```
+
+
+
+## MIGRACIÓ PER CLASSE GENERAL
+
+```{r}
+cmigrclasse<- fmigrclasse(dades, "Taula pivotada", "Taula classe per migració", "Distribució classes per migracio")
+
+```
+
+```{r}
+migrclasse<- fmigrclasse2(dades, "Taula pivotada", "Taula classe per migració", "Distribució classes per migracio")
+
+```
+
+## MIGRACIÓ X CLASSE X EB
+
+### LIBERAL
+
+```{r}
+dliberal <- dades %>%
+  filter(modeb %in% c("1"))
+
+cmigrclasse.liberal<- fmigrclasse(dliberal, "Taula pivotada EB liberal", "Taula classe per migració EB liberal", "Distribució classes per migracio EB liberal")
+
+migrclasse.liberal<- fmigrclasse2(dliberal, "Taula pivotada EB liberal", "Taula classe per migració EB liberal", "Distribució classes per migracio EB liberal")
+
+
+```
+
+### CONSERVADOR
+
+```{r}
+dconservador <- dades %>%
+  filter(modeb %in% c("2"))
+
+cmigrclasse.conservador<- fmigrclasse(dconservador, "Taula pivotada EB conservador", "Taula classe per migració EB conservador", "Distribució classes per migracio EB conservador")
+
+migrclasse.conservador<- fmigrclasse2(dconservador, "Taula pivotada EB conservador", "Taula classe per migració EB conservador", "Distribució classes per migracio EB conservador")
+```
+
+### SOCIALDEMÒCRATA
+
+```{r}
+dsocialdem <- dades %>%
+  filter(modeb %in% c("3"))
+
+cmigrclasse.socialdem<- fmigrclasse(dsocialdem, "Taula pivotada EB socialdemòcrata", "Taula classe per migració EB socialdemòcrata", "Distribució classes per migracio EB socialdemòcrata")
+
+migrclasse.socialdem<- fmigrclasse2(dsocialdem, "Taula pivotada EB socialdemòcrata", "Taula classe per migració EB socialdemòcrata", "Distribució classes per migracio EB socialdemòcrata")
+```
+
+
+
+### FAMILIARISTA
+
+```{r}
+dfamiliarista <- dades %>%
+  filter(modeb %in% c("4"))
+
+cmigrclasse.familiarista<- fmigrclasse(dfamiliarista, "Taula pivotada EB familiarista", "Taula classe per migració EB familiarista", "Distribució classes per migracio EB familiarista")
+
+migrclasse.familiarista<- fmigrclasse2(dfamiliarista, "Taula pivotada EB familiarista", "Taula classe per migració EB familiarista", "Distribució classes per migracio EB familiarista")
+
+```
+
+## MIGRACIÓ X CLASSE X CONTINENT
+
+*Petita variació a la funció var sense col·lapsar:*
+
+```{r}
+fmigrclassepais <- function(dades, nombre_tabla1, nombre_tabla2, titulo_grafico) {
+  # Crear la tabla de frecuencias
+  migrclasse <- as.data.frame(table(dades$migr.c, dades$class5))
+  colnames(migrclasse) <- c("Migració", "Classe", "Freqüència")
+  
+  # Eliminar la fila correspondiente a "No migrant" si existe
+  migrclasse <- migrclasse %>%
+    filter(Migració != "No migrant")
+  
+  # Crear y mostrar la primera tabla
+  tmigrclasse <- create_nice_table(migrclasse, nombre_tabla1)
+  print(tmigrclasse)
+  
+  # Crear la tabla pivotada
+  tmigrclasse2 <- migrclasse %>%
+    spread(key = Migració, value = Freqüència, fill = 0)
+  
+  colnames(tmigrclasse2) <- c("Classe", "Migrant 1a generació", "Migrant 2a generació")
+  
+  # Crear y mostrar la segunda tabla
+  tmigrclasse2_nice <- create_nice_table(tmigrclasse2, nombre_tabla2)
+  print(tmigrclasse2_nice)
+  
+  # Calcular proporciones y ordenar
+  tmigrclasse3 <- migrclasse %>%
+    group_by(Migració) %>%
+    mutate(Prop = Freqüència / sum(Freqüència) * 100) %>%
+    ungroup()
+  
+  ordered_migracio <- tmigrclasse3 %>%
+    filter(Classe == "Unskilled workers") %>%
+    arrange(desc(Prop)) %>%
+    pull(Migració)
+  
+  tmigrclasse3 <- tmigrclasse3 %>%
+    mutate(Migració = factor(Migració, levels = ordered_migracio))
+  
+  # Crear el gráfico
+  plot_migrants_classe <- ggplot(tmigrclasse3, aes(x = Migració, y = Prop, fill = Classe)) +
+    geom_bar(stat = "identity", position = "stack") +
+    geom_text(aes(label = paste0(round(Prop, 1), "%")), position = position_stack(vjust = 0.5), color = "black", size = 3) +
+    labs(title = titulo_grafico, x = "", y = "Proporció (%)") +
+    scale_fill_brewer(palette = "Set3") +
+    theme_minimal() +
+    guides(fill = guide_legend(title = "Classe")) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          axis.text.y = element_text(size = 8),
+          plot.title = element_text(hjust = 0.5, size = 10))
+  
+  # Mostrar el gráfico
+  print(plot_migrants_classe)
+}
+
+
+```
+
+*Petita variació a la funció var col·lapsada:*
+
+```{r}
+
+ordre.migr <- c("Migrant sense papers", "Migrant", "Mare migrant", "Pare migrant", "Pare i mare migrant")
+
+fmigrclassepais2 <- function(df, columna_condicion, columna_continent, niveles_condicion, titulo) {
+  # Convertir a formato largo
+  df_long <- df %>%
+    pivot_longer(cols = columna_condicion, 
+                 names_to = "Condicio", values_to = "Proporcio")
+  
+  # Ordenar los continentes por la proporción de "Migrant sense papers"
+  ordered_continents <- df %>%
+    arrange(desc(`Migrant sense papers`)) %>%
+    pull(!!sym(columna_continent))
+  
+  # Reordenar el factor "Continent" basado en el orden de "Migrant sense papers"
+  df_long[[columna_continent]] <- factor(df_long[[columna_continent]], levels = ordered_continents)
+  
+  # Convertir la columna Condicio a un factor con el orden deseado
+  df_long$Condicio <- factor(df_long$Condicio, levels = niveles_condicion)
+  
+  # Crear el gráfico de barras apiladas
+  plot <- ggplot(df_long, aes_string(x = columna_continent, y = "Proporcio", fill = "Condicio")) +
+    geom_bar(stat = "identity", position = "stack") +
+    geom_text(aes(label = paste0(round(Proporcio, 1), "%")), 
+              position = position_stack(vjust = 0.5),
+              color = "black", 
+              size = 3) +
+    labs(title = titulo, x = "Continent", y = "Proporció (%)") +
+    scale_fill_brewer(palette = "Set3") +
+    theme_minimal() +
+    guides(fill = guide_legend(title = "Condició de Migrant")) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          axis.text.y = element_text(size = 8),
+          plot.title = element_text(hjust = 0.5, size = 10))
+  
+  return(plot)
+}
+```
+
+
+### EUROPA
+
+
+```{r}
+
+deuropa <- dades %>%
+  filter(origenmigracio %in% c("Europa"))
+
+cmigrclasse.europa<- fmigrclassepais(deuropa, "Taula pivotada classe per migració Europa", "Taula classe per migració Europa", "Distribució classes per migracio Europa")
+
+migrclasse.europa<- fmigrclassepais2(deuropa, "Taula pivotada classe per migració Europa", "Taula classe per migració Europa", "Distribució classes per migracio Europa")
+
+
+```
+
+### ÀFRICA
+
+```{r}
+levels(dades$origenmigracio)
+dafrica <- dades %>%
+  filter(grepl("Àfrica", origenmigracio))
+
+cmigrclasse.africa<- fmigrclassepais(dafrica, "Taula pivotada classe per migració Àfrica", "Taula classe per migració Àfrica", "Distribució classes per migracio Àfrica")
+
+migrclasse.africa<- fmigrclassepais2(dafrica, "Taula pivotada classe per migració Àfrica", "Taula classe per migració Àfrica", "Distribució classes per migracio Àfrica")
+
+
+```
+### ÀSIA
+
+```{r}
+levels(dades$origenmigracio)
+dasia <- dades %>%
+  filter(grepl("Àsia", origenmigracio))
+
+cmigrclasse.asia<- fmigrclassepais(dasia, "Taula pivotada classe per migració Àsia", "Taula classe per migració Àsia", "Distribució classes per migracio Àsia")
+
+migrclasse.asia<- fmigrclassepais2(dasia, "Taula pivotada classe per migració Àsia", "Taula classe per migració Àsia", "Distribució classes per migracio Àsia")
+
+
+```
+
+
+### SUD AMÈRICA I EL CARIAB
+
+```{r}
+levels(dades$origenmigracio)
+dsudam <- dades %>%
+  filter(grepl("Sud Amèrica i Carib", origenmigracio))
+
+cmigrclasse.sudam<- fmigrclassepais(dsudam, "Taula pivotada classe per migració Sud Amèrica i Carib", "Taula classe per migració Sud Amèrica i Carib", "Distribució classes per migracio Sud Amèrica i Carib")
+
+migrclasse.sudam<- fmigrclassepais2(dsudam, "Taula pivotada classe per migració Sud Amèrica i Carib", "Taula classe per migració Sud Amèrica i Carib", "Distribució classes per migracio Sud Amèrica i Carib")
+
+
+```
+
+### AUSTRALÀSIA
+
+```{r}
+levels(dades$origenmigracio)
+daustral <- dades %>%
+  filter(grepl("Australàsia", origenmigracio))
+
+cmigrclasse.austral<- fmigrclassepais(daustral, "Taula pivotada classe per migració Australàsia", "Taula classe per migració Australàsia", "Distribució classes per migracio Australàsia")
+
+migrclasse.austral<- fmigrclassepais2(daustral, "Taula pivotada classe per migració Australàsia", "Taula classe per migració Australàsia", "Distribució classes per migracio Australàsia")
+
+
+```
+
+# MIGRACIÓ AL LLARG DE LES COHORTS
+
+```{r}
+ggplot(migrants, aes(x = cohort, group = migracio, color = migracio)) +
+  geom_line(stat = "count") +
+  labs(title = "Evolución de las condiciones de migrante a lo largo del tiempo",
+       x = "Cohorte de Edad",
+       y = "Número de Casos") +
+  theme_minimal()
+```
+
+
+Amb més detall a través de l'any de naixement: 
+
+```{r}
+ggplot(migrants, aes(x = yrbrn, group = migracio, color = migracio)) +
+  geom_line(stat = "count") +
+  labs(title = "Evolución de las condiciones de migrante a lo largo del tiempo",
+       x = "Cohorte de Edad",
+       y = "Número de Casos") +
+  theme_minimal()
+```
+
+
+
+

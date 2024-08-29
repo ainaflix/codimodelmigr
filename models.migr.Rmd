@@ -1,0 +1,317 @@
+---
+title: "Proves models"
+author: "Aina Flix"
+date: "2024-06-06"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## moure la significació 99% (en el big data tot es significatiu)
+
+```{r, include=FALSE}
+library(dplyr)
+library(haven)
+library(knitr)
+library(tidyverse)
+library(ggrepel)
+library(logmult)
+library(MASS)
+library(xtable)
+library(flextable)
+library(officer)
+library(dplyr)
+library(ggplot2)
+library(labelled)
+library(questionr)
+library(gridExtra)
+library(car)
+library(randomForest)
+library(nnet)
+library(caret)
+library(vcd)
+library(FactoMineR)
+library(factoextra)
+library(glmnet)
+library(reshape2)
+library(corrplot)
+library(broom)
+library(ROSE)
+library(smotefamily)
+library(ggmap)
+library(sf)
+library(eurostat)
+library(giscoR)
+```
+
+
+```{r}
+create_nice_table <- function(data, title) {
+  flextable(data) %>%
+    set_table_properties(width = 1, layout = "autofit") %>%
+    theme_zebra() %>%
+    theme_vanilla() %>%
+    set_caption(title)
+}
+
+```
+
+
+
+```{r}
+dades <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/dades.csv")
+```
+
+```{r}
+
+var.factor <- c("essround","cntry", "gndr", "desti", "origen", "modeb", "cohort", "migracio", "origenmigracio", "migr.c", "movabs")
+dades[var.factor] <- lapply(dades[var.factor], factor)
+summary(dades)
+```
+
+
+
+
+
+
+
+# PROVES ESTADÍSTIQUES UNIVARIANTS
+
+## ANÀLISI DE LA VARIANÇA: 
+
+### ANOVA MIRGACIÓ CLASSE
+Convertim la variable destí en numèric per tal que sigui continua i poder fer el test ANOVA. Això té sentit donat que la variable té un ordre lògic. 
+
+```{r}
+
+anova_migrclasse <- aov(as.numeric(desti) ~ migr.c, data = dades)
+summary(anova_migrclasse)
+
+```
+El resultat d'aquest ANOVA suggereix que hi ha una diferència significativa entre les mitjanes de les diferents classes socials (desti) en relació amb la condició de migrant (migr.c). Això significa que la condició de migrant té efectes en la posició de classe.
+
+Valors P: En ambdós casos, un valor p baix indica que hi ha diferències significatives entre els grups. No obstant això, en l'enfocament categòric, estàs avaluant directament les diferències entre categories.
+
+F-statistic: El valor F proporciona informació sobre la relació entre la variació explicada i la variació residual. Un valor F alt i un valor p baix suggereixen que la variable independent té un efecte significatiu en la variable dependent.
+
+### ANOVA MIGRACIÓ MOVABS
+
+```{r}
+
+anova_migrmobabs <- aov(as.numeric(movabs) ~ migr.c, data = dades)
+summary(anova_migrmobabs)
+
+
+```
+
+
+### ANOVA MIGRACIÓ2 CLASSE
+
+```{r}
+
+anova_migr2classe <- aov(as.numeric(desti) ~ migracio, data = dades)
+summary(anova_migrclasse)
+
+```
+### ANOVA MIGRACIÓ2 MOBABS
+
+```{r}
+
+anova_migr2movabs <- aov(as.numeric(movabs) ~ migracio, data = dades)
+summary(anova_migrclasse)
+
+```
+
+### ANOVA MIGR.C, DESTI, MODEB
+
+```{r}
+anova_migr_classe_modeb <- aov(as.numeric(desti) ~ migr.c * modeb, data = dades)
+summary(anova_migr_classe_modeb)
+```
+
+Conclusió General
+Condició de Migrant (migr.c): Té un efecte significatiu sobre la variable de resposta, amb diferències significatives entre els diferents nivells de condició de migrant.
+
+Model d'Estat del Benestar (modeb): Presenta un efecte significatiu sobre la variable de resposta, amb diferències significatives entre els diferents models d'estat del benestar.
+
+Interacció (migr.c): És significativa, indicant que l'efecte del model d'estat del benestar sobre la variable de resposta depèn de la condició de migrant i viceversa.
+
+
+
+
+
+
+
+
+
+
+## CHI QUADRAT
+
+```{r}
+t.mobabs.migr <- table(dades$movabs, dades$migr.c)
+chisq.test(t.mobabs.migr)
+```
+
+```{r}
+prop.table(t.mobabs.migr, margin = 1)  # Proporciones por fila
+prop.table(t.mobabs.migr, margin = 2)  # Proporciones por columna
+```
+
+```{r}
+t.desti.migr <- table(dades$desti, dades$migr.c)
+chisq.test(t.desti.migr)
+```
+
+```{r}
+t.modeb.migr <- table(dades$modeb, dades$migr.c)
+chisq.test(t.modeb.migr)
+```
+Valor Chi-Quadrat (X-squared): Un valor alt de Chi-Quadrat (234.05) suggereix que hi ha una diferència significativa entre les freqüències observades i les freqüències esperades sota la hipòtesi nul·la (que les variables són independents).
+
+Graus de llibertat (df): Els graus de llibertat estan determinats pel nombre de categories en cada variable menys un. Aquí, els graus de llibertat són 4.
+
+Valor p (p-value): El valor p és extremadament baix (< 2.2e-16), cosa que indica que la probabilitat que l'associació observada sigui deguda a l'atzar és pràcticament nul·la. Això suggereix que hi ha una associació significativa entre movabs i migr.c.
+
+Hi ha una relació significativa:
+
+```{r}
+mosaic(~ movabs + migr.c, data = dades, shade = TRUE, legend = TRUE)
+```
+
+
+# CORRELACIÓ ENTRE VARIABLES
+
+## PER PAÏSOS
+
+```{r}
+correlacions_paisos <- dades %>%
+  group_by(cntry) %>%
+  summarise(
+    cor_classe = assocstats(table(migr.c, desti))$cramer,
+    cor_mobabs = assocstats(table(migr.c, movabs))$cramer
+  )
+
+
+
+```
+
+
+
+# ANÀLISI DE CORRESPONDÈNCIA
+
+## per movabs
+```{r}
+# Crear una tabla de contingencia para las variables migr.c y movabs
+contingency_table <- table(dades$migr.c, dades$movabs)
+print(contingency_table)
+
+```
+
+```{r}
+cramers_v <- assocstats(contingency_table)
+cramers_v$cramer
+```
+
+```{r}
+# Realizar el análisis de correspondencias
+ca_result <- CA(contingency_table, graph = FALSE)
+
+# Visualización del análisis de correspondencias
+AC_mobabs<- fviz_ca_biplot(ca_result, repel = TRUE)
+
+ggsave("AC_mobabs.png", plot = AC_mobabs)
+
+```
+
+Proximitat de Punts: Els punts que estan a prop en el gràfic indiquen que les categories estan associades. Per exemple, si 1g migrant està a prop d'ascendent, això indica que els migrants de primera generació tendeixen a tenir mobilitat ascendent.
+
+Direcció i Distància: La direcció i la distància entre els punts representen la relació entre les categories. Les categories més properes a l'origen del gràfic (punt (0,0)) tenen una contribució menor a les dimensions de l'anàlisi.
+
+Angles i Clústers: Si dues categories formen un angle petit amb l'origen, estan associades. Els clústers de punts indiquen grups de categories que tendeixen a estar relacionades entre si.
+
+```{r}
+# Contribución de las categorías a las dimensiones
+print(ca_result$row$contrib)
+print(ca_result$col$contrib)
+
+```
+## per classe
+```{r}
+# Crear una tabla de contingencia para las variables migr.c y movabs
+contingency_table2 <- table(dades$migr.c, dades$desti)
+print(contingency_table2)
+
+```
+
+```{r}
+cramers_v2 <- assocstats(contingency_table2)
+cramers_v2$cramer
+```
+
+```{r}
+# Realizar el análisis de correspondencias
+ca_result2 <- CA(contingency_table2, graph = FALSE)
+
+# Visualización del análisis de correspondencias
+ac_classe<- fviz_ca_biplot(ca_result2, repel = TRUE)
+
+ggsave("ac_classe.png", plot = ac_classe)
+
+```
+
+## MAPES EUROPA
+
+```{r}
+correlacions_paisos <- dades %>%
+  group_by(cntry) %>%
+  summarise(
+    cor_classe = assocstats(table(migr.c, desti))$cramer,
+    cor_mobabs = assocstats(table(migr.c, movabs))$cramer
+  )
+
+
+correlacions_paisos$cntry <- as.character(correlacions_paisos$cntry)
+
+correlacions_paisos$cntry[correlacions_paisos$cntry == "GR"] <- "EL"
+
+
+correlacions_paisos$cntry[correlacions_paisos$cntry == "GB"] <- "UK"
+
+```
+
+```{r}
+
+mapa_europa <- get_eurostat_geospatial(output_class = "sf", resolution = "20", nuts_level = 0)
+
+mapa_europa <- mapa_europa %>%
+  rename(cntry = CNTR_CODE)
+
+
+mapa_correlation <- merge(mapa_europa, correlacions_paisos, by = "cntry", all.x = TRUE)
+
+
+mapaac_classe<-ggplot(mapa_correlation) +
+  geom_sf(aes(fill = cor_classe)) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, na.value = "grey50") +
+  labs(title = "Correlació entre migració i classe per pais (Cramér's V)",
+       fill = "Cramér's V") +
+  theme_minimal()
+
+
+
+mapaac_movbabs<- ggplot(mapa_correlation) +
+  geom_sf(aes(fill = cor_mobabs)) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, na.value = "grey50") +
+  labs(title = "Correlació entre migració i mobilitat social per pais (Cramér's V)",
+       fill = "Cramér's V") +
+  theme_minimal()
+
+ggsave("mapaac_classe.png", plot = mapaac_classe)
+ggsave("mapaac_movbabs.png", plot = mapaac_movbabs)
+
+```
+

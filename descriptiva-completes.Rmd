@@ -1,0 +1,313 @@
+---
+title: "Descriptiva Dades Completes"
+author: "Aina Flix"
+date: "2024-07-26"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r, include=FALSE}
+library(dplyr)
+library(haven)
+library(knitr)
+library(tidyverse)
+library(ggrepel)
+library(logmult)
+library(MASS)
+library(xtable)
+library(flextable)
+library(officer)
+library(dplyr)
+library(ggplot2)
+library(labelled)
+library(questionr)
+library(gridExtra)
+library(car)
+library(randomForest)
+library(nnet)
+library(caret)
+library(vcd)
+library(FactoMineR)
+library(factoextra)
+library(glmnet)
+library(reshape2)
+library(corrplot)
+library(broom)
+library(ROSE)
+library(DMwR2)
+library(smotefamily)
+library(skimr)
+library(forcats)
+library(tidyr)
+```
+
+```{r}
+dades <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/dadescompletes.csv")
+```
+
+# PREPROCESSAMENT
+
+## Conversió a factors
+
+Variables categòriques ordinals
+```{r}
+
+levels(dades$impfml)[levels(dades$impfml) == "ExtremelyUnimportant"] <- 0
+levels(dades$impfml)[levels(dades$impfml) == "ExtremelyÌmportant"] <- 10
+var.ordinals <- list(
+  impfml = 0:10,
+  impfrds = 0:10,
+  implsrt = 0:10,
+  imppol = 0:10,
+  impwrk = 0:10,
+  imprlg = 0:10,
+  impvo = 0:10
+)
+
+
+for (var in names(var.ordinals)) {
+  dades[[var]] <- factor(dades[[var]], levels = var.ordinals[[var]], ordered = TRUE)
+}
+
+```
+
+Variables categòriques 
+
+```{r}
+var.factor <- c("cntry", "gndr", "empl", "truwrkp", "jbspv", "uemp3m", "hincsrc", "domicil", "edulvla", "origenmigracio", "migr.c", "modeb", "cohort")
+dades[var.factor] <- lapply(dades[var.factor], factor)
+
+```
+
+
+
+## Canviem noms
+
+```{r}
+dades <- dades %>%
+  mutate(
+    gndr = fct_recode(gndr, Male = "1", Female = "2"),
+    empl = fct_recode(empl, Employed = "1", SelfEmployed = "2", NotInPaidWork = "3"),
+    truwrkp = fct_recode(truwrkp, Yes = "1", No = "2"),
+    jbspv = fct_recode(jbspv, Yes = "1", No = "2"),
+    uemp3m = fct_recode(uemp3m, Yes = "1", No = "2"),
+    hincsrc = fct_recode(hincsrc, Wages = "1", SelfEmployment = "2", Pensions = "3", UnemploymentBenefit = "4", SocialBenefits = "5", Investments = "6", OtherSources = "7"),
+    impfml = fct_recode(impfml, ExtremelyUnimportant = "0", `1` = "1", `2` = "2", `3` = "3", `4` = "4", `5` = "5", `6` = "6", `7` = "7", `8` = "8", `9` = "9", ExtremelyImportant = "10"),
+    domicil = fct_recode(domicil, BigCity = "1", Suburbs = "2", SmallCity = "3", CountryVillage = "4", Countryside = "5"),
+    edulvla = fct_recode(edulvla, NotHarmonized = "0", LessSecondary = "1", LowerSecondary = "2", UpperSecondary = "3", PostSecondary = "4", Tertiary = "5"),
+    modeb = fct_recode(modeb, Liberal = "1", Socialdemòcrata = "2", Conservador = "3", Familiarista = "4")
+  )
+
+```
+
+```{r}
+summary(dades)
+```
+
+
+
+# DESCRIPTIVA  
+
+```{r}
+# Frecuencias y porcentajes para variables categóricas
+categorical_vars <- c('cntry', 'gndr', 'empl', 'truwrkp', 'jbspv', 'uemp3m', 'hincsrc', 'impfml', 'impfrds', 'implsrt', 'imppol', 'impwrk', 'imprlg', 'impvo', 'domicil', 'edulvla', 'origenmigracio', 'migr.c', 'modeb', 'cohort')
+
+for (var in categorical_vars) {
+  print(var)
+  print(table(dades[[var]]))
+  print(prop.table(table(dades[[var]])) * 100)
+}
+
+# Medidas de tendencia central y dispersión para variables numéricas
+numerical_vars <- c('yrbrn', 'njbspv', 'eduyrs')
+
+skim(dades[numerical_vars])
+```
+
+
+```{r}
+# Tablas de contingencia y gráficos por condición de migrante
+for (var in categorical_vars) {
+  if (var != "migr.c") {
+    print(var)
+    print(table(dades$migr.c, dades[[var]]))
+    print(prop.table(table(dades$migr.c, dades[[var]]), 1) * 100)
+  }
+}
+
+# Visualización de d
+# Boxplot de años de educación por condición de migrante
+plot_anysedu<- ggplot(dades, aes(x = migr.c, y = eduyrs, fill = migr.c)) +
+  geom_boxplot() +
+  labs(title = "Anys d'Educació per Condició de Migrant", x = NULL, y = NULL) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(plot.title = element_text(hjust = 0.5, size = 12),  
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))  
+
+# Barplot de importància de la família per cohorts
+plot_cohort_imp<- ggplot(dades, aes(x = cohort, fill = impfml)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Importància de la Família per Cohort", x = NULL, y = NULL) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(plot.title = element_text(hjust = 0.5, size = 12),  
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))  
+
+# Barplot d'origen de migració
+plot_origenmigr<-ggplot(dades, aes(x = origenmigracio, fill = migr.c)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Origen de Migració per Condició de Migrant", x = NULL, y = NULL) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(plot.title = element_text(hjust = 0.5, size = 12),  
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))  
+
+plot_anysedu
+plot_cohort_imp
+plot_origenmigr
+
+ggsave("plot_anysedu.png", plot = plot_anysedu)
+ggsave("plot_cohort_imp.png", plot = plot_cohort_imp)
+ggsave("plot_origenmigr.png", plot = plot_origenmigr)
+
+```
+## VARIABLES IMPORTÀNCIA: 
+
+```{r}
+plot_percentage <- function(data, x_var, fill_var, title) {
+  data %>%
+    group_by(.data[[fill_var]], .data[[x_var]]) %>%
+    summarise(count = n()) %>%
+    mutate(percentage = count / sum(count) * 100) %>%
+    ggplot(aes_string(x = x_var, y = "percentage", fill = fill_var)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(title = title, x = NULL, y = NULL) +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5))+
+    theme(plot.title = element_text(hjust = 0.5, size = 12),  
+          axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))  
+}
+
+# Descriptives de les variables "impfml", "impfrds", "implsrt", "imppol", "impwrk", "imprlg", "impvo" segons "migr.c"
+plot_impfml <- plot_percentage(dades, "impfml", "migr.c", 
+                               "Importància de la família segons condició de migrant")
+
+plot_impfrds <- plot_percentage(dades, "impfrds", "migr.c", 
+                                "Importància dels amics segons condició de migrant")
+
+plot_implsrt <- plot_percentage(dades, "implsrt", "migr.c", 
+                                "Importància del temps lliure segons condició de migrant")
+
+plot_imppol <- plot_percentage(dades, "imppol", "migr.c", 
+                               "Importància de la política segons condició de migrant")
+
+plot_impwrk <- plot_percentage(dades, "impwrk", "migr.c", 
+                               "Importància del treball segons condició de migrant")
+
+plot_imprlg <- plot_percentage(dades, "imprlg", "migr.c", 
+                               "Importància de la religió segons condició de migrant")
+
+plot_impvo <- plot_percentage(dades, "impvo", "migr.c", 
+                              "Importància d'organitzacions voluntàries segons condició de migrant")
+
+plot_impfml
+plot_impfrds
+plot_implsrt
+plot_imppol
+plot_impwrk
+plot_imprlg
+plot_impvo
+
+ggsave("impfml.png", plot = plot_impfml)
+ggsave("impfrds.png", plot = plot_impfrds)
+ggsave("implsrt.png", plot = plot_implsrt)
+ggsave("imppol.png", plot = plot_imppol)
+ggsave("impwrk.png", plot = plot_impwrk)
+ggsave("imprlg.png", plot = plot_imprlg)
+ggsave("imovo.png", plot = plot_impvo)
+```
+
+## EMPL, HINCSRC, EDULVLA I DOMICIL
+
+
+```{r}
+
+plot_empl <- plot_percentage(dades, "empl", "migr.c", "Situació laboral segons condició de migrant")
+
+
+plot_hincsrc <- plot_percentage(dades, "hincsrc", "migr.c", 
+                                "Font principal d'ingressos de la llar segons condició de migrant")
+
+plot_edulvla <- plot_percentage(dades, "edulvla", "migr.c", 
+                                "Nivell educatiu més alt assolit segons condició de migrant")
+
+plot_domicil <- plot_percentage(dades, "domicil", "migr.c", "Zona d'habitat segons la condició de migrant")
+plot_empl
+plot_hincsrc
+plot_edulvla
+plot_domicil
+
+ggsave("imovo.png", plot = plot_empl)
+ggsave("imovo.png", plot = plot_hincsrc)
+ggsave("imovo.png", plot = plot_edulvla)
+ggsave("imovo.png", plot = plot_domicil)
+
+
+```
+
+
+
+## VARIABLES DE SI/NO
+
+```{r}
+
+
+plot_percentage <- function(data, x_var, fill_var, facet_var, title) {
+  # Calcula los porcentajes dentro de cada grupo de migración y estado del bienestar
+  data %>%
+    group_by(across(all_of(c(fill_var, facet_var))), .data[[x_var]]) %>%
+    summarise(count = n(), .groups = 'drop') %>%
+    group_by(across(all_of(c(fill_var, facet_var)))) %>%
+    mutate(percentage = count / sum(count) * 100) %>%
+    ungroup() %>%
+    ggplot(aes(x = .data[[x_var]], y = percentage, fill = .data[[x_var]])) +  # Use x_var for fill to separate by response
+    geom_bar(stat = "identity", position = "dodge") +
+    facet_grid(facets = paste(facet_var, '~', fill_var)) +
+    labs(title = title, x = NULL, y = NULL) +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5))+
+    theme(plot.title = element_text(hjust = 0.5, size = 12),  
+          axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) 
+}
+
+# Asegurarse de que las variables son factores
+dades <- dades %>%
+  mutate(across(c("uemp3m", "jbspv", "truwrkp", "migr.c", "modeb"), as.factor))
+
+# Crear y mostrar los gráficos
+plot_uemp3m <- plot_percentage(dades, "uemp3m", "migr.c", "modeb", 
+                               "A l'atur els últims 3 mesos segons Estat del Benestar")
+
+plot_jbspv <- plot_percentage(dades, "jbspv", "migr.c", "modeb", 
+                              "Responsable de supervisar treball segons model d'Estat del Benestar")
+
+plot_truwrkp <- plot_percentage(dades, "truwrkp", "migr.c", "modeb", 
+                                "Sindicat al lloc de treball segons model d'Estat del Benestar")
+plot_cohort_modeb <- plot_percentage(dades, "cohort", "migr.c", "modeb", 
+                                "Distribució de condició de migració, segons cohort i model d'Estat del Benestar")
+
+ggsave("plot_uemp3m.png", plot = plot_uemp3m)
+ggsave("plot_jbspvimpfrds.png", plot = plot_jbspv)
+ggsave("plot_truwrkp.png", plot = plot_truwrkp)
+ggsave("plot_cohort_modeb.png", plot = plot_cohort_modeb)
+plot_cohort_modeb
+plot_truwrkp
+plot_uemp3m
+plot_jbspv
+
+summary(dades$jbspv)
+
+```
+

@@ -1,0 +1,648 @@
+---
+title: "Models Completes"
+author: "Aina Flix"
+date: "2024-07-28"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+
+```{r, include=FALSE}
+library(dplyr)
+library(haven)
+library(knitr)
+library(tidyverse)
+library(ggrepel)
+library(logmult)
+library(MASS)
+library(xtable)
+library(flextable)
+library(officer)
+library(dplyr)
+library(ggplot2)
+library(labelled)
+library(questionr)
+library(gridExtra)
+library(car)
+library(randomForest)
+library(nnet)
+library(caret)
+library(vcd)
+library(FactoMineR)
+library(factoextra)
+library(glmnet)
+library(reshape2)
+library(corrplot)
+library(broom)
+library(ROSE)
+library(DMwR2)
+library(smotefamily)
+library(skimr)
+library(forcats)
+library(tidyr)
+library(pROC)
+library(UBL)
+library(randomForest)
+```
+
+
+```{r}
+dades <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/dadescompletes.csv")
+dades2<- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/dades.csv")
+
+dades <- merge(dades, dades2[, c("idno", "desti", "movabs")], by = "idno", all.x = TRUE)
+
+completas<- complete.cases(dades)
+sum(completas)
+dades<- dades[completas, ]
+
+```
+
+# PREPROCESSAMENT
+
+
+Variables categòriques ordinals
+
+```{r}
+
+var.ordinals <- list(
+  impfml = 0:10,
+  impfrds = 0:10,
+  implsrt = 0:10,
+  imppol = 0:10,
+  impwrk = 0:10,
+  imprlg = 0:10,
+  impvo = 0:10
+)
+
+
+for (var in names(var.ordinals)) {
+  dades[[var]] <- factor(dades[[var]], levels = var.ordinals[[var]], ordered = TRUE)
+}
+```
+
+Variables categòriques 
+
+```{r}
+
+
+var.factor <- c("cntry", "gndr", "empl", "truwrkp", "jbspv", "uemp3m", "hincsrc", "domicil", "edulvla", "origenmigracio", "migr.c", "modeb", "cohort", "desti", "movabs")
+dades[var.factor] <- lapply(dades[var.factor], factor)
+```
+
+
+```{r}
+summary(dades)
+```
+
+
+## PARTICIÓ ENTRENAMENT
+
+
+
+```{r}
+set.seed(123)  
+trainIndex <- createDataPartition(dades$migr.c, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+df_train <- dades[ trainIndex,]
+df_test  <- dades[-trainIndex,]
+```
+
+
+# MODEL LOGISTIC MULTINOMIAL
+
+## AVALUAR MODELS
+
+
+```{r}
+avaluar_model <- function(modelo, datos_entrenamiento, datos_prueba, etiqueta) {
+  cat(paste("Validació del model amb", etiqueta, ":\n"))
+  
+  coefs <- coef(modelo)
+  stderror <- summary(modelo)$standard.errors
+  
+  coefs_df <- as.data.frame(coefs)
+  rownames(coefs_df) <- rownames(coefs)
+  
+  coefs_table <- kable(coefs_df, caption = paste("Coeficients del model -", etiqueta))
+  cat("Coeficients:\n")
+  print(coefs_table)
+  
+  
+  z_values <- coefs / stderror
+  p_values <- 2 * (1 - pnorm(abs(z_values)))
+  
+  resum <- round(as.data.frame(p_values), 5)
+  rownames(resum) <- rownames(coefs_df)
+  colnames(resum) <- colnames(coefs_df)
+  
+ 
+  pvalues_table <- kable(resum, caption = paste("P-valors -", etiqueta))
+  cat("P-valors:\n")
+  print(pvalues_table)
+  
+  # Calcular AIC
+  aic_value <- AIC(modelo)
+  cat(paste("AIC:", aic_value, "\n"))
+  
+  
+  predicciones <- predict(modelo, newdata = datos_prueba)
+  
+ 
+  predicciones <- factor(predicciones, levels = levels(datos_prueba$migr.c))
+  
+
+  tabla_confusion <- table(Predicted = predicciones, Actual = datos_prueba$migr.c)
+  
+  
+  confusion_matrix_table <- kable(as.data.frame.matrix(tabla_confusion), caption = paste("Matriu de Confusió -", etiqueta))
+  cat("Matriu de Confusió:\n")
+  print(confusion_matrix_table)
+  
+  # Calcular la precisión
+  precision <- sum(diag(tabla_confusion)) / sum(tabla_confusion)
+  cat(paste("Presició del model:", etiqueta, "amb dades de prova:", round(precision, 4), "\n"))
+  
+  # Crear el informe de clasificación
+  informe <- confusionMatrix(predicciones, datos_prueba$migr.c)
+  
+  # Crear y mostrar tabla de informe de clasificación
+  informe_table <- kable(as.data.frame(informe$byClass), caption = paste("Informe de Classificació -", etiqueta))
+  cat("Informe de Classificació:\n")
+  print(informe_table)
+  
+  # Curvas ROC y AUC
+  if ("multinom" %in% class(modelo)) {
+    pred_probs <- predict(modelo, newdata = datos_prueba, type = "probs")
+    roc_curves <- lapply(levels(datos_prueba$migr.c), function(class) {
+      roc(datos_prueba$migr.c == class, pred_probs[, class])
+    })
+    
+    # Graficar ROC para cada clase
+    plot(roc_curves[[1]], main = "Corbes ROC par a cada classe")
+    for(i in 2:length(roc_curves)) {
+      lines(roc_curves[[i]]$sensitivities, roc_curves[[i]]$specificities, col = i)
+    }
+    legend("bottomright", legend = levels(datos_prueba$migr.c), col = 1:length(roc_curves), lty = 1)
+  }
+}
+
+```
+
+
+
+
+
+
+Fem que el level sobre quin es compari sigui "No migrant"
+
+```{r}
+
+df_train$migr.c <- relevel(df_train$migr.c, ref = "No migrant")
+```
+
+
+## MULTINOM 1
+
+```{r}
+
+multinom1 <- multinom(migr.c ~ . -origenmigracio -idno , data = df_train)
+summary(multinom1)
+avaluar_model(multinom1, df_train, df_test, "Model multinomial 1") 
+
+```
+
+
+
+## SMOTE
+
+No migrant: 83.99%
+1g migrant: 9.94%
+2g migrant: 6.07%
+He provat de fer-ho amb paquet SMOTE: limitacions- no tenia variables numèriques i no em funcionava 
+
+### ONE HOT SCONDING
+
+És necessari fer numèriques les variables ja que utilitza mètodes basasts en la distància per poder generar nous exemples
+
+```{r}
+df_train <- df_train[, !names(df_train) %in% c("idno", "origenmigracio")]
+df_test <- df_test[, !names(df_test) %in% c("idno", "origenmigracio")]
+
+# Separar variables predictoras y objetivo
+X_train <- df_train[, -which(names(df_train) == "migr.c")]
+y_train <- df_train$migr.c
+
+# Realizar One-Hot Encoding para convertir factores en variables numéricas
+dummy <- dummyVars("~ .", data = X_train)
+X_train_ohe <- predict(dummy, newdata = X_train)
+
+
+# Asegurarse de que y_train sea un factor
+y_train <- factor(y_train, levels = unique(y_train))
+```
+
+
+#### COMPROVACIONS
+```{r}
+# Comprobar la estructura de X_train_ohe
+str(X_train_ohe)
+
+# Comprobar si todas las columnas son numéricas
+summary(sapply(X_train_ohe, is.numeric))
+
+# Comprobar la estructura de y_train
+str(y_train)
+
+# Comprobar la distribución de las clases en y_train
+table(y_train)
+
+
+
+```
+
+
+### SOBREMOSTREIG
+
+```{r}
+avaluar_model <- function(modelo, datos_entrenamiento, datos_prueba, etiqueta) {
+  cat(paste("Validació del model amb", etiqueta, ":\n"))
+  
+  coefs <- coef(modelo)
+  stderror <- summary(modelo)$standard.errors
+  
+  coefs_df <- as.data.frame(coefs)
+  rownames(coefs_df) <- rownames(coefs)
+  
+  coefs_table <- kable(coefs_df, caption = paste("Coeficients del model -", etiqueta))
+  cat("Coeficients:\n")
+  print(coefs_table)
+  
+  z_values <- coefs / stderror
+  p_values <- 2 * (1 - pnorm(abs(z_values)))
+  
+  resum <- round(as.data.frame(p_values), 5)
+  rownames(resum) <- rownames(coefs_df)
+  colnames(resum) <- colnames(coefs_df)
+  
+  pvalues_table <- kable(resum, caption = paste("P-valors -", etiqueta))
+  cat("P-valores:\n")
+  print(pvalues_table)
+  
+  aic_value <- AIC(modelo)
+  cat(paste("AIC:", aic_value, "\n"))
+  
+  predicciones <- predict(modelo, newdata = datos_prueba)
+
+  niveles_reales <- levels(datos_prueba$class)
+  predicciones <- factor(predicciones, levels = niveles_reales)
+
+  if(length(predicciones) != length(datos_prueba$class)) {
+    stop("Error: Les prediccines i el valors reals no tenen la mateixa longitud.")
+  }
+
+  tabla_confusion <- table(Predicted = predicciones, Actual = datos_prueba$class)
+  
+  confusion_matrix_table <- kable(as.data.frame.matrix(tabla_confusion), caption = paste("Matriu de Confusió -", etiqueta))
+  cat("Matriu de Confusió:\n")
+  print(confusion_matrix_table)
+  
+  precision <- sum(diag(tabla_confusion)) / sum(tabla_confusion)
+  cat(paste("Precisió del modelo amb", etiqueta, "amb dades de prova:", round(precision, 4), "\n"))
+  
+  informe <- confusionMatrix(predicciones, datos_prueba$class)
+  
+  
+  informe_table <- kable(as.data.frame(informe$byClass), caption = paste("Informe de Classificació -", etiqueta))
+  cat("Informe de Classificació:\n")
+  print(informe_table)
+  
+  if ("multinom" %in% class(modelo)) {
+    pred_probs <- predict(modelo, newdata = datos_prueba, type = "probs")
+    roc_curves <- lapply(niveles_reales, function(class) {
+      roc(datos_prueba$class == class, pred_probs[, class])
+    })
+    
+    plot(roc_curves[[1]], main = "Corbes ROC per a cada classe")
+    for(i in 2:length(roc_curves)) {
+      lines(roc_curves[[i]]$sensitivities, roc_curves[[i]]$specificities, col = i)
+    }
+    legend("bottomright", legend = niveles_reales, col = 1:length(roc_curves), lty = 1)
+  }
+}
+
+
+```
+
+
+
+```{r}
+
+df_train_ohe <- data.frame(X_train_ohe, class = y_train)
+
+data_smote <- SmoteClassif(class ~ ., df_train_ohe, C.perc = "balance")
+
+table(data_smote$class)
+
+
+```
+## MODEL I AVALUACIÓ
+
+```{r}
+# Ajustar el modelo multinomial con los datos sobre-muestreados
+multinom_smote <- multinom(class ~ ., data = data_smote)
+
+X_test_ohe <- predict(dummy, newdata = df_test[, -which(names(df_test) == "migr.c")])
+X_test_ohe <- as.data.frame(X_test_ohe)
+
+# Asegurar que los nombres de columnas coincidan entre el conjunto de entrenamiento y prueba
+colnames(X_test_ohe) <- colnames(X_train_ohe)
+
+# Crear el conjunto de datos de prueba con la variable objetivo
+df_test_ohe <- data.frame(X_test_ohe)
+df_test_ohe$class <- df_test$migr.c
+
+# Evaluar el modelo usando la función previamente definida 'avaluar_model'
+avaluar_model(multinom_smote, data_smote, df_test_ohe, "Modelo Multinomial con SMOTE usando smotefamily")
+names(data_smote)
+names(df_test_ohe)
+
+
+
+```
+
+## SMOTE 2
+
+```{r}
+data_smote2 <- SmoteClassif(class ~ ., df_train_ohe, C.perc = list("1g migrant" = 1, "2g migrant" = 1, "No migrant" = 0.5))
+
+table(data_smote2$class)
+
+multinom_smote2 <- multinom(class ~ ., data = data_smote2)
+
+avaluar_model(multinom_smote2, data_smote2, df_test_ohe, "Modelo Multinomial con SMOTE usando smotefamily")
+
+```
+
+## SMOTE 3
+
+```{r}
+data_smote3 <- SmoteClassif(class ~ ., df_train_ohe, C.perc = list("1g migrant" = 3, "2g migrant" = 4, "No migrant" = 1))
+
+multinom_smote3 <- multinom(class ~ ., data = data_smote3)
+table(data_smote3$class)
+
+avaluar_model(multinom_smote3, data_smote3, df_test_ohe, "Modelo Multinomial con SMOTE usando smotefamily")
+
+```
+
+## SMOTE 4
+
+```{r}
+data_smote4 <- SmoteClassif(class ~ ., df_train_ohe, C.perc = list("1g migrant" = 4, "2g migrant" = 5, "No migrant" = 0.8))
+
+multinom_smote4 <- multinom(class ~ ., data = data_smote4)
+table(data_smote4$class)
+
+avaluar_model(multinom_smote4, data_smote4, df_test_ohe, "Modelo Multinomial con SMOTE usando smotefamily")
+```
+
+
+
+## SMOTE 6: EL BO
+
+Reduïm variables
+
+```{r}
+treure <- c(
+  grep("^cntry\\.", names(data_smote), value = TRUE)
+)
+data_smote6 <- data_smote[, !(names(data_smote) %in% treure)]
+
+multinom_smote6 <- multinom(class ~ ., data = data_smote6)
+
+
+avaluar_model(multinom_smote6, data_smote6, df_test_ohe, "Modelo Multinomial con SMOTE usando smotefamily")
+```
+
+## SMOTE 7
+
+Model només amb les variables d'importància
+
+```{r}
+variables_imp <- grep("^imp", names(data_smote), value = TRUE)
+
+
+variables_imp <- c(variables_imp, "class")
+
+# Crear un nuevo conjunto de datos con solo variables_imp variables seleccionadas
+data_smote7 <- data_smote[, variables_imp]
+
+
+
+# Entrenar el modelo multinomial solo con las variables seleccionadas
+multinom_imp <- multinom(class ~ ., data = data_smote7)
+
+# Evaluar el modelo con la función de evaluación definida previamente
+avaluar_model(multinom_imp, data_smote7, df_test_ohe, "Modelo Multinomial solo con variables imp")
+```
+
+
+
+## SMOTE 8 GENEREM INTERACCIONS
+
+```{r}
+
+names(data_smote6)
+
+variables_smote8 <- c("gndr.1", "gndr.2", "empl.1", "empl.2", "empl.3", 
+                           "truwrkp.1", "truwrkp.2", "truwrkp.Not.in.a.paid.work", "truwrkp.Self.employed", 
+                           "jbspv.1", "jbspv.2", "jbspv.3", "jbspv.Not.in.a.paid.work", "jbspv.Self.employed", 
+                           "njbspv", "uemp3m.1", "uemp3m.2", 
+                           "hincsrc.1", "hincsrc.2", "hincsrc.3", "hincsrc.4", "hincsrc.5", "hincsrc.6", "hincsrc.7",
+                           "impfml.L", "impfml.Q", "impfml.C", "impfml.4", "impfml.5", "impfml.6", "impfml.7", "impfml.8", "impfml.9", "impfml.10",
+                           "impfrds.L", "impfrds.Q", "impfrds.C", "impfrds.4", "impfrds.5", "impfrds.6", "impfrds.7", "impfrds.8", "impfrds.9", "impfrds.10",
+                           "implsrt.L", "implsrt.Q", "implsrt.C", "implsrt.4", "implsrt.5", "implsrt.6", "implsrt.7", "implsrt.8", "implsrt.9", "implsrt.10",
+                           "imppol.L", "imppol.Q", "imppol.C", "imppol.4", "imppol.5", "imppol.6", "imppol.7", "imppol.8", "imppol.9", "imppol.10",
+                           "impwrk.L", "impwrk.Q", "impwrk.C", "impwrk.4", "impwrk.5", "impwrk.6", "impwrk.7", "impwrk.8", "impwrk.9", "impwrk.10",
+                           "imprlg.L", "imprlg.Q", "imprlg.C", "imprlg.4", "imprlg.5", "imprlg.6", "imprlg.7", "imprlg.8", "imprlg.9", "imprlg.10",
+                           "impvo.L", "impvo.Q", "impvo.C", "impvo.4", "impvo.5", "impvo.6", "impvo.7", "impvo.8", "impvo.9", "impvo.10",
+                           "domicil.1", "domicil.2", "domicil.3", "domicil.4", "domicil.5", "edulvla.1", "edulvla.2", "edulvla.3", "edulvla.4", "edulvla.5", 
+                           "eduyrs", "cohort.1937.1949", "cohort.1950.1960", "cohort.1961.1970", "cohort.1971.1980")
+
+# Definir las interacciones importantes
+interaccions_smote8 <- c("impwrk.L*empl.1", "impwrk.L*empl.2", "impwrk.L*empl.3",
+                               "impfml.L*truwrkp.1", "impfml.L*truwrkp.2", "impfml.L*truwrkp.Not.in.a.paid.work",
+                               "implsrt.L*jbspv.1", "implsrt.L*jbspv.2", "implsrt.L*jbspv.Not.in.a.paid.work",
+                               "imppol.L*uemp3m.1", "imppol.L*uemp3m.2",
+                               "impvo.L*hincsrc.1", "impvo.L*hincsrc.2", "impvo.L*hincsrc.3")
+
+# Combinar variables principales e interacciones
+formula_smote8 <- reformulate(termlabels = c(variables_smote8, interaccions_smote8), response = "class")
+
+# Entrenar el modelo con la fórmula completa
+multinom_interaccions <- multinom(formula_smote8, data = data_smote)
+
+# Evaluar el modelo con la función de evaluación definida
+avaluar_model(multinom_interaccions, data_smote, df_test_ohe, "Modelo Multinomial Completo con Interacciones")
+
+```
+
+# RANDOM FOREST
+
+```{r}
+library(randomForest)
+library(caret)
+library(pROC)
+library(knitr)
+
+avaluar_model_rf <- function(modelo, datos_entrenamiento, datos_prueba, etiqueta) {
+  cat(paste("Validació del model amb", etiqueta, ":\n"))
+  
+  importancia_vars <- importance(modelo)
+  importancia_df <- as.data.frame(importancia_vars)
+  rownames(importancia_df) <- rownames(importancia_vars)
+  
+  importancia_table <- kable(importancia_df, caption = paste("Importància de las variables -", etiqueta))
+  cat("Importància de las variables:\n")
+  print(importancia_table)
+  
+  predicciones <- predict(modelo, newdata = datos_prueba)
+  
+  niveles_reales <- levels(datos_prueba$class)
+  predicciones <- factor(predicciones, levels = niveles_reales)
+  
+  if(length(predicciones) != length(datos_prueba$class)) {
+    stop("Error: Les prediccions i els valors reals no tenen la mateixa longitud.")
+  }
+  
+  # Calcular la matriz de confusión
+  tabla_confusion <- table(Predicted = predicciones, Actual = datos_prueba$class)
+  
+  # Crear y mostrar tabla de matriz de confusión
+  confusion_matrix_table <- kable(as.data.frame.matrix(tabla_confusion), caption = paste("Matriu de Confusió -", etiqueta))
+  cat("Matriu de Confusió:\n")
+  print(confusion_matrix_table)
+  
+  # Calcular la precisión
+  precision <- sum(diag(tabla_confusion)) / sum(tabla_confusion)
+  cat(paste("Precisió del model amb", etiqueta, "amb dades de prova:", round(precision, 4), "\n"))
+  
+  # Crear el informe de clasificación
+  informe <- confusionMatrix(predicciones, datos_prueba$class)
+  
+  # Crear y mostrar tabla de informe de clasificación
+  informe_table <- kable(as.data.frame(informe$byClass), caption = paste("Informe de Classificació -", etiqueta))
+  cat("Informe de Classificació:\n")
+  print(informe_table)
+  
+  # Curvas ROC y AUC
+  pred_probs <- predict(modelo, newdata = datos_prueba, type = "prob")
+  roc_curves <- lapply(niveles_reales, function(class) {
+    roc(datos_prueba$class == class, pred_probs[, class])
+  })
+  
+  # Graficar ROC para cada clase
+  plot(roc_curves[[1]], main = "COrbes ROC para cada clase")
+  for(i in 2:length(roc_curves)) {
+    lines(roc_curves[[i]]$sensitivities, roc_curves[[i]]$specificities, col = i)
+  }
+  legend("bottomright", legend = niveles_reales, col = 1:length(roc_curves), lty = 1)
+}
+
+```
+
+
+```{r}
+data_smote_rf1 <- SmoteClassif(class ~ ., df_train_ohe, C.perc = list("1g migrant" = 4, "2g migrant" = 8, "No migrant" = 1))
+```
+
+
+```{r}
+rf_model1 <- randomForest(class ~ ., data = data_smote, importance = TRUE, ntree = 200)
+
+
+avaluar_model_rf(rf_model1, data_smote, df_test_ohe, "Avaluació de model RF")
+```
+
+# RANDOM FOREST AMB VARIABLES IMPORTANTS I INTERACCIONS
+
+
+
+
+```{r}
+variables_importantes <- c(
+  "gndr.1", "gndr.2", "empl.1", "empl.2", "empl.3", "njbspv", "uemp3m.1", "uemp3m.2",
+  "hincsrc.1", "hincsrc.2", "hincsrc.3",
+  "impfml.L", "impfml.Q", "impfml.C", "impfrds.L", "impfrds.Q", "impfrds.C",
+  "implsrt.L", "implsrt.Q", "implsrt.C", "imppol.L", "imppol.Q", "imppol.C",
+  "impwrk.L", "impwrk.Q", "impwrk.C"
+)
+
+
+
+# Filtrar las variables importantes y agregar interacciones
+df_train_filtered <- df_train_ohe %>%
+  dplyr::select(all_of(variables_importantes))
+
+
+# Supongamos que df_train_filtered y interacciones ya están definidos
+# Función para generar interacciones
+generate_interactions <- function(df, variables) {
+  for (interaction in variables) {
+    vars <- strsplit(interaction, "\\*")[[1]]
+    if (all(vars %in% colnames(df))) {
+      new_col_name <- paste(vars, collapse = "_X_")
+      df[[new_col_name]] <- df[[vars[1]]] * df[[vars[2]]]
+    } else {
+      warning(paste("No se encontraron todas las variables para la interacción:", interaction))
+    }
+  }
+  return(df)
+}
+
+# Variables de interacción a generar
+interacciones <- c("impwrk.L*empl.1", "impwrk.L*empl.2", "impwrk.L*empl.3",
+                   "impfml.L*impwrk.L", "impfml.L*implsrt.L", "impfml.L*imppol.L",
+                   "impfml.L*impfrds.L", "impwrk.L*implsrt.L", "impwrk.L*imppol.L",
+                   "impwrk.L*impfrds.L")
+
+
+df_train_filtered_interactions <- generate_interactions(df_train_filtered, interacciones)
+
+df_train_filtered_interactions$class <- as.factor(df_train$migr.c)
+
+# Asegurarse de que todas las columnas excepto la clase sean numéricas
+df_train_ohe_numeric <- df_train_filtered_interactions %>%
+  dplyr::mutate(across(-class, as.numeric))
+
+
+
+# Verificación de la estructura del dataframe
+str(df_train_ohe_numeric)
+
+# Aplicar SMOTE
+data_smote_rf <- SmoteClassif(class ~ ., df_train_ohe_numeric, C.perc = list("1g migrant" = 4, "2g migrant" = 8, "No migrant" = 1))
+
+rf2 <- randomForest(class ~ ., data = data_smote_rf, importance = TRUE, ntree = 200)
+
+df_test_filtered <- df_test_ohe %>%
+  dplyr::select(all_of(variables_importantes))
+
+# Generar las interacciones en el conjunto de prueba
+df_test_filtered_interactions <- generate_interactions(df_test_filtered, interacciones)
+
+# Asegurarse de que todas las columnas excepto la clase sean numéricas
+df_test_ohe_numeric <- df_test_filtered_interactions %>%
+  dplyr::mutate(across(everything(), as.numeric))
+
+# Convertir la columna de clase a factor (si es necesario)
+df_test_ohe_numeric$class <- as.factor(df_test$migr.c)
+
+
+avaluar_model_rf(rf2, data_smote_rf, df_test_ohe_numeric, "Avaluació del model RF amb selecció de variables importants i interaccions")
+```
+
+
