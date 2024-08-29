@@ -10,10 +10,6 @@ output:
 #IMPORTACIÓ DADES
 ```{r}
 round1 <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/round1.csv")
-round2 <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/round2.csv")
-round3 <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/round3.csv")
-round4 <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/round4.csv")
-round5 <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/round5.csv")
 
 ```
 
@@ -21,44 +17,10 @@ round5 <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/round5.csv")
 
 ```{r}
 varr1<- c("essround", "idno", "cntry",  "gndr", "yrbrn","emplrel", "emplno", "iscoco", "iscocop", "emprelp", "emplnop","ctzcntr","ctzship", "brncntr", "cntbrth", "facntr", "facntn", "mocntr", "mocntn"  )
-r1 <- round1[varr1]
-```
-
-```{r}
-varr2<- c("essround", "idno", "cntry",  "gndr", "yrbrn", "emplrel", "emplno", "iscoco",  "iscocop", "emprelp", "emplnop","ctzcntr","ctzshipa", "brncntr", "cntbrtha", "facntr", "fbrncnt", "mocntr", "mbrncnt" )
-r2 <- round2[varr2]
-
-r2 <- r2 %>% rename(ctzship=ctzshipa , cntbrth= cntbrtha, facntn = fbrncnt, mocntn = mbrncnt)
+d <- round1[varr1]
 ```
 
 
-```{r}
-varr3<- c("essround", "idno", "cntry",  "gndr", "yrbrn", "emplrel", "emplno", "iscoco",  "iscocop", "emprelp", "emplnop","ctzcntr","ctzshipa", "brncntr", "cntbrtha", "facntr", "fbrncnt", "mocntr", "mbrncnt")
-r3 <- round3[varr3]
-
-r3 <- r3 %>% rename(ctzship=ctzshipa , cntbrth= cntbrtha, facntn = fbrncnt, mocntn = mbrncnt)
-```
-
-```{r}
-varr4<- c("essround", "idno", "cntry",  "gndr", "yrbrn", "emplrel", "emplno", "iscoco",  "iscocop", "emprelp", "emplnop","ctzcntr","ctzshipb", "brncntr", "cntbrthb", "facntr", "fbrncnta", "mocntr", "mbrncnta")
-r4 <- round4[varr4]
-
-r4 <- r4 %>% rename(ctzship=ctzshipb , cntbrth= cntbrthb, facntn = fbrncnta, mocntn = mbrncnta)
-```
-
-```{r}
-varr5<- c("essround", "idno", "cntry",  "gndr", "yrbrn", "emplrel", "emplno", "iscoco",  "iscocop", "emprelp", "emplnop","ctzcntr","ctzshipb", "brncntr", "cntbrthb", "facntr", "fbrncnta", "mocntr", "mbrncnta")
-r5 <- round5[varr5]
-
-r5 <- r5 %>% rename(ctzship=ctzshipb , cntbrth= cntbrthb, facntn = fbrncnta, mocntn = mbrncnta)
-```
-
-Combinem els dataframes:
-```{r}
-d <- rbind(r1, r2, r3, r4, r5)
-write.csv(d, "daadesnc.csv", row.names = FALSE)
-d <- subset(d, !(cntry == "FR" & (essround == 1 | essround == 2)))
-```
 
 # CODI CONSTRUCCIÓ CLASSE ROUND 1-5:
 
