@@ -38,19 +38,6 @@ create_nice_table <- function(data, title) {
 ```
 
 
-# IMPORTEM LES DADES I AJUNTEM ELS DATAFRAMES
-
-```{r}
-dadesorigen <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/dadesorigen.csv")
-dadesdesti <- read.csv("~/uni/5è/tfg estadistica/DADES ESTADISTICA/dadesdesti.csv")
-dades<- inner_join( dadesorigen, dadesdesti , by = c("essround", "idno", "gndr", "yrbrn"))
-
-dades<- dades[, -c(3)]
-dades <- dades %>% rename("cntry" = "cntry.y")
-dades <- subset(dades, cntry != "IS")
-```
-
-
 
 
 # REGIONS EB
